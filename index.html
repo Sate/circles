@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+text {
+  font: 10px sans-serif;
+  text-anchor: middle;
+}
+
+.node--hover circle {
+  stroke: #000;
+  stroke-width: 1.2px;
+}
+
+.active circle{
+  stroke: blue;
+  stroke-width: 1.2px;
+}
+
+.activeEnd circle{
+  stroke: green;
+  stroke-width: 1.6px;
+}
+
+</style>
+<svg width="960" height="960"><g transform="translate(1,1)"></g></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.5/lodash.min.js"></script>
+
+<script>
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+var format = d3.format(",d");
+
+var color = d3.scaleSequential(d3.interpolateMagma)
+    .domain([-4, 4]);
+
+var stratify = d3.stratify()
+    .parentId(function(d) { return d.id.substring(0, d.id.lastIndexOf(".")); });
+
+var pack = d3.pack()
+    .size([width - 2, height - 2])
+    .padding(3);
+
+var root;
+var masterData;
+var circle = false;
+var innerGroup = false;
+var leaf = false;
+
+d3.csv("flare.csv", function(error, data) {
+  if (error) throw error;
+
+  root = stratify(data)
+      .sum(function(d) { return d.value; })
+      .sort(function(a, b) { return b.value - a.value; });
+
+  masterData = Object.assign({},root);
+  redraw(d3.hierarchy(masterData)
+    .sum(function(d) { return d.value; })
+    .sort(function(a, b) { return b.value - a.value; }));
+});
+
+
+function redraw(root){
+    // transition
+  var t = d3.transition()
+      .duration(750);
+
+  // hierarchy
+  pack(root);
+
+  //JOIN
+  console.log(root)
+  var node = svg.select("g").selectAll("g")
+      .data(root.descendants(), function(d){ return d.data.id; });
+
+  console.log(node)
+
+
+  var text = svg.selectAll("text")
+      .data(root.descendants(), function(d){ return d.data.id; });
+
+  //EXIT
+  node.exit()
+      .style("fill", "#b26745")
+    .transition(t)
+      .attr("r", 1e-6)
+      .remove();
+  node.selectAll("g").exit().remove();
+  node.selectAll("g").selectAll("circle").exit().remove();
+  if (circle){
+    innerGroup
+    .call(d3.drag()
+      .on("start", null)
+      .on("drag", null)
+      .on("end", null));
+    circle.exit()
+      .style("fill", "#b26745")
+    .transition(t)
+      .attr("r", 1e-6)
+      .remove();
+    circle.selectAll("circle").exit().remove();
+    leaf.exit().remove();
+    innerGroup.exit().remove();
+  }
+
+
+
+  text.exit()
+    .transition(t)
+      .attr("opacity", 1e-6)
+      .remove();
+  text.selectAll("tspan").exit().remove();
+  text.selectAll("title").exit().remove();
+
+
+  //UPDATE
+  node
+    .transition(t)
+      .style("fill", "#3a403d")
+      .attr("r", function(d){ return d.r })
+      .attr("cx", function(d){ return d.x; })
+      .attr("cy", function(d){ return d.y; })
+  if (circle){
+    circle
+        .attr("id", function(d) { return "node-" + d.data.id; })
+        .attr("r", function(d) { return d.r; })
+        .style("fill", function(d) { return color(d.depth); })
+      .transition(t)
+        .style("fill", "#3a403d")
+        .attr("r", function(d){ return d.r })
+        .attr("cx", function(d){ return d.x; })
+        .attr("cy", function(d){ return d.y; })
+    innerGroup
+      .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
+      .attr("class", function(d) { return "node" + (!d.children ? " node--leaf" : d.depth ? "" : " node--root"); })
+      .each(function(d) { d.node = this; })
+
+  }
+
+
+  text
+    .transition(t)
+      .attr("x", function(d){ return d.x; })
+      .attr("y", function(d){ return d.y; });
+
+  //ENTER
+  innerGroup = node.enter().append("g")
+      .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
+      .attr("class", function(d) { return "node" + (!d.children ? " node--leaf" : d.depth ? "" : " node--root"); })
+      .each(function(d) { d.node = this; })
+  circle = innerGroup.append("circle")
+        .attr("id", function(d) { return "node-" + d.data.id; })
+        .attr("r", function(d) { return d.r; })
+        .style("fill", function(d) { return color(d.depth); })
+        .on("mouseover", hovered(true))
+        .on("mouseout", hovered(false));
+  circle.transition(t)
+        .style("fill", function(d) { return color(d.depth); })
+        .attr("r", function(d) { return d.r; })
+
+  leaf = innerGroup.filter(function(d) { return !d.children; });
+
+  innerGroup.append("clipPath")
+    .attr("id", function(d) { return "clip-" + d.data.id; })
+    .style("fill", "#000")
+  .append("use")
+    .attr("xlink:href", function(d) { return "#node-" + d.data.id + ""; });
+
+  innerGroup.append("text")
+    .attr("clip-path", function(d) { return "url(#clip-" + d.data.id + ")"; })
+  .selectAll("tspan")
+  .data(function(d) { return d.data.id.substring(d.data.id.lastIndexOf(".") + 1).split(/(?=[A-Z][^A-Z])/g); })
+  .enter().append("tspan")
+    .attr("x", 0)
+    .attr("y", function(d, i, nodes) { return 13 + (i - nodes.length / 2 - 0.5) * 10; })
+    .style("fill", "#000")
+    .text(function(d) { return d; });
+
+  node.enter().append("title")
+    .text(function(d) { return d.data.id + "\n" + format(d.value); });
+
+  innerGroup
+    .call(d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended));
+}
+
+
+
+
+var dragNode = false;
+var endNode = false;
+var startx = null;
+var starty = null;
+
+function hovered(hover) {
+  return function(d) {
+    d3.selectAll(d.ancestors().map(function(d) { return d.node; })).classed("node--hover", hover);
+    if (dragNode && (dragNode !== d) ){
+      endNode = hover ? d : false;
+      d3.select(d.node).classed('activeEnd', hover);
+    }
+  };
+}
+
+function dragstarted(d){
+  d3.event.sourceEvent.stopPropagation();
+  dragNode = d;
+  startx = parseFloat(d.x);
+  starty = parseFloat(d.y);
+  d3.select(d.node).classed("active", true);
+
+}
+function dragged(d){
+  d3.event.sourceEvent.stopPropagation();
+
+  d.x += d3.event.dx;
+  d.y += d3.event.dy;
+  d3.select(d.node).attr('transform', (d) => {
+    return `translate(` + d.x + ', ' + d.y + ')';
+  })
+}
+
+
+function findNode(n){
+  masterData.children.forEach( (c) => {
+    if (c.children){
+      c.children.forEach( )
+    }
+  })
+}
+
+function seekAndDestroy (n, source){
+  _.remove(source.children, (c) => {
+    if (c.id === n.id){
+      return true;
+    }
+    if (c.children){
+      seekAndDestroy(n, c)
+    }
+    return false;
+  });
+}
+
+function findNode(id, currentNode) {
+    var i, currentChild, result;
+    if (id === currentNode.id) {
+        return currentNode;
+    } else {
+        // Use a for loop instead of forEach to avoid nested functions
+        // Otherwise "return" will not work properly
+        if (currentNode.children){
+          for (i = 0; i < currentNode.children.length; i += 1) {
+            currentChild = currentNode.children[i];
+            result = findNode(id, currentChild);
+            if (result !== false) {
+                return result;
+            }
+          }
+        }
+        // The node has not been found and we have no more options
+        return false;
+    }
+}
+
+function addChildNode(parent, child){
+  console.log(parent, child);
+  delete child.parent;
+  delete child.height;
+  delete child.depth;
+  parent.children = parent.children || [];
+  parent.children.push(child);
+}
+
+function updateData(end, start, startDatum){
+  var temp = findNode(end.id, masterData);
+  console.log(masterData, temp)
+  seekAndDestroy(start, masterData);
+  addChildNode(temp, startDatum);
+}
+
+
+function dragended(d){
+  if (endNode){
+    window.z = endNode
+    console.log(endNode)
+    updateData(endNode.data.data,d.data.data, d.data)
+    // var node = d3.select(d.node).remove();
+    // var n = node._groups[0][0];
+    console.log(masterData);
+    window.aa = masterData;
+
+    // d3.select(endNode.node).append( () => {
+    //   return n;
+    // });
+    d3.select(d.node).classed("active", false);
+    dragNode = false;
+    endNode = false;
+    startx = null;
+    starty = null;
+    redraw(d3.hierarchy(masterData)
+      .sum(function(d) { return d.value; })
+      .sort(function(a, b) { return b.value - a.value; }));
+  } else {
+    console.log('else')
+    console.log(d,startx,starty)
+    d.x = startx;
+    d.y = starty;
+    d3.select(d.node).transition().attr('transform', (d) => {
+      return `translate(` + startx + ', ' + starty + ')';
+    });
+  }
+  d3.select(d.node).classed("active", false);
+  dragNode = false;
+  endNode = false;
+  startx = null;
+  starty = null;
+}
+</script>
