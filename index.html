@@ -55,7 +55,7 @@ d3.csv("flare.csv", function(error, data) {
   if (error) throw error;
 
   root = stratify(data)
-      .sum(function(d) { return d.value; })
+      .sum(function(d) { console.log(d); return d.value; })
       .sort(function(a, b) { return b.value - a.value; });
 
   masterData = Object.assign({},root);
@@ -79,7 +79,7 @@ function redraw(root){
   var node = svg.select("g").selectAll("g")
       .data(root.descendants(), function(d){ return d.data.id; });
 
-  console.log(node)
+  console.log(root)
 
 
   var text = svg.selectAll("text")
@@ -104,9 +104,9 @@ function redraw(root){
     .transition(t)
       .attr("r", 1e-6)
       .remove();
-    circle.selectAll("circle").exit().remove();
-    leaf.exit().remove();
-    innerGroup.exit().remove();
+    // circle.selectAll("circle").exit().remove();
+    // leaf.exit().remove();
+    // innerGroup.exit().remove();
   }
 
 
@@ -127,16 +127,16 @@ function redraw(root){
   //     .attr("cx", function(d){ return d.x; })
   //     .attr("cy", function(d){ return d.y; })
   if (circle){
-    circle
-        .attr("id", function(d) { return "node-" + d.data.id; })
-      circle.transition(t)
-        .style("fill", function(d) { return color(d.depth); })
-        .attr("r", function(d){ return d.r })
     innerGroup
       .transition()
       .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
       .attr("class", function(d) { return "node" + (!d.children ? " node--leaf" : d.depth ? "" : " node--root"); })
       .each(function(d) { d.node = this; })
+    circle
+        .attr("id", function(d) { return "node-" + d.data.id; })
+    circle.transition(t)
+        .style("fill", function(d) { return color(d.depth); })
+        .attr("r", function(d){ return d.r })
 
   }
 
