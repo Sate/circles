@@ -67,6 +67,7 @@ d3.csv("flare.csv", function(error, data) {
 
 function redraw(root){
     // transition
+  // svg.select("g").node().innerHTML = "";
   var t = d3.transition()
       .duration(750);
 
@@ -74,7 +75,7 @@ function redraw(root){
   pack(root);
 
   //JOIN
-  console.log(root)
+  console.log(root.descendants())
   var node = svg.select("g").selectAll("g")
       .data(root.descendants(), function(d){ return d.data.id; });
 
@@ -119,23 +120,20 @@ function redraw(root){
 
 
   //UPDATE
-  node
-    .transition(t)
-      .style("fill", "#3a403d")
-      .attr("r", function(d){ return d.r })
-      .attr("cx", function(d){ return d.x; })
-      .attr("cy", function(d){ return d.y; })
+  // node
+  //   .transition(t)
+  //     .style("fill", "#3a403d")
+  //     .attr("r", function(d){ return d.r })
+  //     .attr("cx", function(d){ return d.x; })
+  //     .attr("cy", function(d){ return d.y; })
   if (circle){
     circle
         .attr("id", function(d) { return "node-" + d.data.id; })
-        .attr("r", function(d) { return d.r; })
+      circle.transition(t)
         .style("fill", function(d) { return color(d.depth); })
-      .transition(t)
-        .style("fill", "#3a403d")
         .attr("r", function(d){ return d.r })
-        .attr("cx", function(d){ return d.x; })
-        .attr("cy", function(d){ return d.y; })
     innerGroup
+      .transition()
       .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
       .attr("class", function(d) { return "node" + (!d.children ? " node--leaf" : d.depth ? "" : " node--root"); })
       .each(function(d) { d.node = this; })
