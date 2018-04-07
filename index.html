@@ -69,7 +69,7 @@ d3.csv("flare.csv", function(error, data) {
 
 function redraw(root){
     // transition
-  // svg.select("g").node().innerHTML = "";
+  svg.select("g").node().innerHTML = "";
   var t = d3.transition()
       .duration(750);
 
@@ -95,20 +95,18 @@ function redraw(root){
       .remove();
   node.selectAll("g").exit().remove();
   node.selectAll("g").selectAll("circle").exit().remove();
+  node.selectAll("text").exit().remove();
+  node.selectAll("tspan").exit().remove();
   if (circle){
-    innerGroup
-    .call(d3.drag()
-      .on("start", null)
-      .on("drag", null)
-      .on("end", null));
+
     circle.exit()
       .style("fill", "#b26745")
     .transition(t)
       .attr("r", 1e-6)
       .remove();
-    // circle.selectAll("circle").exit().remove();
-    // leaf.exit().remove();
-    // innerGroup.exit().remove();
+    circle.selectAll("circle").exit().remove();
+    leaf.exit().remove();
+    innerGroup.exit().remove();
   }
 
 
@@ -139,6 +137,11 @@ function redraw(root){
     circle.transition(t)
         .style("fill", function(d) { return color(d.depth); })
         .attr("r", function(d){ return d.r })
+    node.selectAll("g")
+        .transition()
+          .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
+          .attr("class", function(d) { return "node" + (!d.children ? " node--leaf" : d.depth ? "" : " node--root"); })
+          .each(function(d) { d.node = this; })
 
   }
 
@@ -184,6 +187,12 @@ function redraw(root){
   node.enter().append("title")
     .text(function(d) { return d.data.id + "\n" + format(d.value); });
 
+
+  innerGroup
+    .call(d3.drag()
+      .on("start", null)
+      .on("drag", null)
+      .on("end", null));
   innerGroup
     .call(d3.drag()
       .on("start", dragstarted)
@@ -274,6 +283,8 @@ function addChildNode(parent, child){
   delete child.parent;
   delete child.height;
   delete child.depth;
+  console.log(parent.value)
+  delete parent.value;
   parent.children = parent.children || [];
   parent.children.push(child);
 }
