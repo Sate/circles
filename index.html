@@ -50,7 +50,7 @@ var circle = false;
 var innerGroup = false;
 var leaf = false;
 
-d3.csv("flare.csv", function(error, data) {
+d3.csv("https://gist.githubusercontent.com/Sate/8beb05dd7f01520f00450a384c226f6a/raw/ed860772573311839b434c7417bbb808559a88b9/flare.csv", function(error, data) {
   if (error) throw error;
 
   root = stratify(data)
