@@ -37,9 +37,6 @@ var svg = d3.select("svg"),
 
 var format = d3.format(",d");
 
-var color = d3.scaleSequential(d3.interpolateMagma)
-    .domain([-4, 4]);
-
 var stratify = d3.stratify()
     .parentId(function(d) { return d.id.substring(0, d.id.lastIndexOf(".")); });
 
@@ -61,125 +58,45 @@ d3.csv("flare.csv", function(error, data) {
       .sort(function(a, b) { return b.value - a.value; });
 
   masterData = Object.assign({},root);
+  sanitize(masterData);
+
   redraw(d3.hierarchy(masterData)
-    .sum(function(d) { return d.value; })
+    .sum(function(d) { return d.data.value; })
     .sort(function(a, b) { return b.value - a.value; }));
 });
 
 
-function redraw(root){
-    // transition
-  // svg.select("g").node().innerHTML = "";
-  var t = d3.transition()
-      .duration(750);
+function redraw(rootNode){
 
-  // hierarchy
-  pack(root);
+  var color = d3.scaleSequential(d3.interpolateMagma)
+    .domain([-rootNode.height, rootNode.height]);
 
-  //JOIN
-
+  // update Pack layout
   var node = svg.select("g").selectAll("g")
-      .data(root.descendants(), function(d){ return d.data.id; });
+  .data(pack(rootNode).descendants(), function(d) {return d.data.id });
 
-  var cc = svg.select("g").selectAll("circle")
-      .data(root.descendants(), function(d){ return d.data.id; });
-  console.log(root)
+  //Exit
+  //So far nothing should exit
+  node.exit().remove();
 
-
-  var text = svg.selectAll("text")
-      .data(root.descendants(), function(d){ return d.data.id; });
-
-  //EXIT
-  node.exit()
-      .style("fill", "#b26745")
-    .transition(t)
-      .attr("r", 1e-6)
-      .remove();
-  node.selectAll("g").exit().remove();
-  node.selectAll("g").selectAll("circle").exit().remove();
-  node.selectAll("text").exit().remove();
-  node.selectAll("tspan").exit().remove();
+  // Update circle location and size
   if (circle){
-
-    circle.exit()
-      .style("fill", "#b26745")
-    .transition(t)
-      .attr("r", 1e-6)
-      .remove();
-    circle.selectAll("circle").exit().remove();
-    leaf.exit().remove();
-    innerGroup.exit().remove();
-    node.selectAll("circle").exit().remove();
-  }
-
-
-
-  text.exit()
-    .transition(t)
-      .attr("opacity", 1e-6)
-      .remove();
-  text.selectAll("tspan").exit().remove();
-  text.selectAll("title").exit().remove();
-
-
-  //UPDATE
-  // node
-  //   .transition(t)
-  //     .style("fill", "#3a403d")
-  //     .attr("r", function(d){ return d.r })
-  //     .attr("cx", function(d){ return d.x; })
-  //     .attr("cy", function(d){ return d.y; })
-  if (circle){
-    innerGroup
-      .transition()
-      .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
+    node
       .attr("class", function(d) { return "node" + (!d.children ? " node--leaf" : d.depth ? "" : " node--root"); })
       .each(function(d) { d.node = this; })
-    circle
-        .attr("id", function(d) { return "node-" + d.data.id; })
-    circle.transition(t)
-        .style("fill", function(d) { return color(d.depth); })
-        .attr("r", function(d){ return d.r })
-    node.selectAll("g")
-        .classed('activeEnd', false)
-        .classed('active', false)
-        .transition()
-          .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
-          .attr("class", function(d) { return "node" + (!d.children ? " node--leaf" : d.depth ? "" : " node--root"); })
-          .each(function(d) { d.node = this; })
-
+      .transition()
+      .duration(750)
+      .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
     node.selectAll("circle")
-        .attr("id", function(d) { return "node-" + d.data.id; })
-        .attr("r", function(d) { return d.r; })
-        .style("fill", function(d) { return color(d.depth); })
-        .classed('activeEnd', false)
-        .classed('active', false)
-    console.log(node.selectAll("circle"))
-      node.selectAll("g")
-        .attr("id", function(d) { return "clip-" + d.data.id; })
-        .style("fill", "#000")
-        .append("use")
-        .attr("xlink:href", function(d) { return "#node-" + d.data.id + ""; });
-
-      node.selectAll("text")
-        .attr("clip-path", function(d) { return "url(#clip-" + d.data.id + ")"; })
-        .selectAll("tspan")
-        .data(function(d) { return d.data.id.substring(d.data.id.lastIndexOf(".") + 1).split(/(?=[A-Z][^A-Z])/g); })
-        .enter().append("tspan")
-        .attr("x", 0)
-        .attr("y", function(d, i, nodes) { return 13 + (i - nodes.length / 2 - 0.5) * 10; })
-        .style("fill", "#000")
-        .text(function(d) { return d; });
-
-      node.selectAll("title")
-        .text(function(d) { return d.data.id + "\n" + format(d.value); });
+      .data(pack(rootNode).descendants(), function(d) {return d.data.id })
+      .attr("id", function(d) { return "node-" + d.data.id; })
+      .on("mouseover", hovered(true))
+      .on("mouseout", hovered(false))
+      .transition()
+      .duration(750)
+      .attr("r", function(d) { return d.r; })
+      .style("fill", function(d) { return color(d.depth); })
   }
-
-
-  text
-    .transition(t)
-      .attr("x", function(d){ return d.x; })
-      .attr("y", function(d){ return d.y; });
 
   //ENTER
   innerGroup = node.enter().append("g")
@@ -192,19 +109,19 @@ function redraw(root){
         .style("fill", function(d) { return color(d.depth); })
         .on("mouseover", hovered(true))
         .on("mouseout", hovered(false));
-  circle.transition(t)
+  circle.transition()
         .style("fill", function(d) { return color(d.depth); })
         .attr("r", function(d) { return d.r; })
 
   leaf = innerGroup.filter(function(d) { return !d.children; });
 
-  innerGroup.append("clipPath")
+  leaf.append("clipPath")
     .attr("id", function(d) { return "clip-" + d.data.id; })
     .style("fill", "#000")
   .append("use")
     .attr("xlink:href", function(d) { return "#node-" + d.data.id + ""; });
 
-  innerGroup.append("text")
+  leaf.append("text")
     .attr("clip-path", function(d) { return "url(#clip-" + d.data.id + ")"; })
   .selectAll("tspan")
   .data(function(d) { return d.data.id.substring(d.data.id.lastIndexOf(".") + 1).split(/(?=[A-Z][^A-Z])/g); })
@@ -214,24 +131,12 @@ function redraw(root){
     .style("fill", "#000")
     .text(function(d) { return d; });
 
-  node.enter().append("title")
-    .text(function(d) { return d.data.id + "\n" + format(d.value); });
-
-
-  innerGroup
-    .call(d3.drag()
-      .on("start", null)
-      .on("drag", null)
-      .on("end", null));
   innerGroup
     .call(d3.drag()
       .on("start", dragstarted)
       .on("drag", dragged)
       .on("end", dragended));
 }
-
-
-
 
 var dragNode = false;
 var endNode = false;
@@ -254,25 +159,21 @@ function dragstarted(d){
   startx = parseFloat(d.x);
   starty = parseFloat(d.y);
   d3.select(d.node).classed("active", true);
-
 }
+
 function dragged(d){
   d3.event.sourceEvent.stopPropagation();
-
   d.x += d3.event.dx;
   d.y += d3.event.dy;
-  d3.select(d.node).attr('transform', (d) => {
+
+  d3.select(d.node).raise().attr('transform', (d) => {
     return `translate(` + d.x + ', ' + d.y + ')';
-  })
-}
-
-
-function findNode(n){
-  masterData.children.forEach( (c) => {
-    if (c.children){
-      c.children.forEach( )
+  });
+  if (d.children){
+    for (var i = d.children.length - 1; i >= 0; i--) {
+      dragged(d.children[i]);
     }
-  })
+  }
 }
 
 function seekAndDestroy (n, source){
@@ -288,77 +189,73 @@ function seekAndDestroy (n, source){
 }
 
 function findNode(id, currentNode) {
-    var i, currentChild, result;
-    if (id === currentNode.id) {
-        return currentNode;
-    } else {
-        // Use a for loop instead of forEach to avoid nested functions
-        // Otherwise "return" will not work properly
-        if (currentNode.children){
-          for (i = 0; i < currentNode.children.length; i += 1) {
-            currentChild = currentNode.children[i];
-            result = findNode(id, currentChild);
-            if (result !== false) {
-                return result;
-            }
-          }
+  var i, currentChild, result;
+  if (id === currentNode.id) {
+      return currentNode;
+  } else {
+    // Use a for loop instead of forEach to avoid nested functions
+    // Otherwise "return" will not work properly
+    if (currentNode.children){
+      for (i = 0; i < currentNode.children.length; i += 1) {
+        currentChild = currentNode.children[i];
+        result = findNode(id, currentChild);
+        if (result !== false) {
+            return result;
         }
-        // The node has not been found and we have no more options
-        return false;
+      }
     }
+    // The node has not been found and we have no more options
+    return false;
+  }
 }
 
 function addChildNode(parent, child){
-  console.log(parent, child);
   delete child.parent;
   delete child.height;
   delete child.depth;
-  console.log(parent.value)
   delete parent.value;
   parent.children = parent.children || [];
   parent.children.push(child);
+  parent.value = _.sumBy(parent.children, (c) =>{ return c.value})
 }
 
 function updateData(end, start, startDatum){
   var temp = findNode(end.id, masterData);
-  console.log(masterData, temp)
   seekAndDestroy(start, masterData);
   addChildNode(temp, startDatum);
 }
 
 
+function sanitize(data){
+  delete data.value;
+  delete data.height;
+  delete data.depth;
+  delete data.parent;
+  if (data.children){
+    for (var i = data.children.length - 1; i >= 0; i--) {
+      sanitize(data.children[i]);
+    }
+  }
+}
+
 function dragended(d){
   if (endNode){
-    window.z = endNode
-    console.log(endNode)
     updateData(endNode.data.data,d.data.data, d.data)
-    // var node = d3.select(d.node).remove();
-    // var n = node._groups[0][0];
-    console.log(masterData);
-    window.aa = masterData;
-
-    // d3.select(endNode.node).append( () => {
-    //   return n;
-    // });
-    d3.select(d.node).classed("active", false);
-    dragNode = false;
-    endNode = false;
-    startx = null;
-    starty = null;
-    var data = Object.assign({}, masterData);
-    redraw(d3.hierarchy(data)
-      .sum(function(d) { return d.value; })
+    sanitize(masterData);
+    redraw(d3.hierarchy(masterData)
+      .sum(function(d) { return d.data.value; })
       .sort(function(a, b) { return b.value - a.value; }));
   } else {
-    console.log('else')
-    console.log(d,startx,starty)
     d.x = startx;
     d.y = starty;
     d3.select(d.node).transition().attr('transform', (d) => {
       return `translate(` + startx + ', ' + starty + ')';
     });
   }
-  d3.select(d.node).classed("active", false);
+
+  //Reset drag states
+  d3.selectAll("g").classed("active", false);
+  d3.selectAll("g").classed("activeEnd", false);
   dragNode = false;
   endNode = false;
   startx = null;
